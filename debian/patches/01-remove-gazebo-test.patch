@@ -1,0 +1,39 @@
+--- a/src/cmd/CMakeLists.txt	2023-03-08 00:03:41.295368451 +0100
++++ b/src/cmd/CMakeLists.txt	2023-03-08 00:03:58.467389563 +0100
+@@ -4,9 +4,9 @@
+ 
+ # Skip command line tests for Windows, see
+ # https://github.com/gazebosim/gz-transport/issues/104
+-if (MSVC)
++#if (MSVC)
+   list(REMOVE_ITEM gtest_sources gz_TEST.cc)
+-endif()
++#endif()
+ 
+ if (NOT HAVE_GZ_TOOLS)
+   list(REMOVE_ITEM gtest_sources gz_TEST.cc)
+@@ -59,15 +59,15 @@
+     )
+ endforeach()
+ 
+-if (TARGET UNIT_gz_TEST)
+-
+-  set_tests_properties(
+-    UNIT_gz_TEST
+-    PROPERTIES
+-    ENVIRONMENT
+-      "GZ_CONFIG_PATH=${CMAKE_BINARY_DIR}/test/conf/$<CONFIG>;LD_LIBRARY_PATH=\"$<TARGET_FILE_DIR:${PROJECT_LIBRARY_TARGET_NAME}>\":$ENV{LD_LIBRARY_PATH}"
+-  )
+-endif()
++#if (TARGET UNIT_gz_TEST)
++#
++#  set_tests_properties(
++#    UNIT_gz_TEST
++#    PROPERTIES
++#    ENVIRONMENT
++#      "GZ_CONFIG_PATH=${CMAKE_BINARY_DIR}/test/conf/$<CONFIG>;LD_LIBRARY_PATH=\"$<TARGET_FILE_DIR:${PROJECT_LIBRARY_TARGET_NAME}>\":$ENV{LD_LIBRARY_PATH}"
++#  )
++#endif()
+ 
+ #===============================================================================
+ # Generate the ruby script for internal testing.

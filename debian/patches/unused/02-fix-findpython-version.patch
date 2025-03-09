@@ -1,0 +1,11 @@
+--- a/CMakeLists.txt	2024-01-28 17:52:43.549191691 +0100
++++ b/CMakeLists.txt	2024-01-28 17:53:09.713256671 +0100
+@@ -148,7 +148,7 @@
+     find_package(pybind11 2.4 QUIET)
+ 
+     if (${pybind11_FOUND})
+-      find_package(Python3 ${GZ_PYTHON_VERSION} REQUIRED COMPONENTS Development)
++      find_package(Python3 ${Python3_VERSION} EXACT REQUIRED COMPONENTS Development)
+       message (STATUS "Searching for pybind11 - found version ${pybind11_VERSION}.")
+     else()
+       GZ_BUILD_WARNING("pybind11 is missing: Python interfaces are disabled.")

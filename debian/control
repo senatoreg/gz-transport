@@ -1,0 +1,64 @@
+Source: gz-transport
+Section: libs
+Priority: optional
+Maintainer: Giovanni Senatore <giovanni.senatore@gmail.com>
+Rules-Requires-Root: no
+Build-Depends:
+ debhelper-compat (= 13),
+ cmake,
+ gz-cmake,
+ gz-tools,
+ libgz-utils-dev,
+ libgz-math-dev,
+ libgz-msgs-dev,
+ ruby-gz-msgs,
+ cppzmq-dev,
+Standards-Version: 4.6.2
+Homepage: https://gazebosim.org/
+#Vcs-Browser: https://salsa.debian.org/debian/gz-transport
+#Vcs-Git: https://salsa.debian.org/debian/gz-transport.git
+
+Package: libgz-transport-dev
+Section: libdevel
+Architecture: any
+Multi-Arch: same
+Depends:
+ libgz-transport14 (= ${binary:Version}),
+ ${misc:Depends},
+Description: Transport library for component communication based on publication/subscription and service calls - development files
+ Gazebo Transport, a component of Gazebo, provides fast and efficient
+ asyncronous message passing, services, and data logging.
+
+Package: libgz-transport14
+Architecture: any
+Multi-Arch: same
+Depends:
+ ${shlibs:Depends},
+ ${misc:Depends},
+Description: Transport library for component communication based on publication/subscription and service calls
+ Gazebo Transport, a component of Gazebo, provides fast and efficient
+ asyncronous message passing, services, and data logging.
+
+Package: ruby-gz-transport
+Architecture: any
+Multi-Arch: same
+Depends:
+ ruby,
+ ${shlibs:Depends},
+ ${misc:Depends},
+ libgz-transport14 (= ${binary:Version}),
+Description: Transport library for component communication based on publication/subscription and service calls
+ Gazebo Transport, a component of Gazebo, provides fast and efficient
+ asyncronous message passing, services, and data logging.
+
+Package: python3-gz-transport
+Architecture: any
+Multi-Arch: same
+Depends:
+ ${python3:Depends},
+ ${shlibs:Depends},
+ ${misc:Depends},
+ libgz-transport14 (= ${binary:Version}),
+Description: Transport library for component communication based on publication/subscription and service calls
+ Gazebo Transport, a component of Gazebo, provides fast and efficient
+ asyncronous message passing, services, and data logging.
