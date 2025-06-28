@@ -346,8 +346,9 @@ class MyTestClass
     // Request a valid service using RequestRaw.
     std::string reqStr, repStr, repTypeName;
     req.SerializeToString(&reqStr);
-    EXPECT_TRUE(this->node.RequestRaw(g_topic, reqStr, req.GetTypeName(),
-          rep.GetTypeName(), timeout, repStr, result));
+    EXPECT_TRUE(this->node.RequestRaw(g_topic, reqStr,
+          std::string(req.GetTypeName()),
+          std::string(rep.GetTypeName()), timeout, repStr, result));
     rep.ParseFromString(repStr);
     ASSERT_TRUE(result);
     EXPECT_EQ(rep.data(), data);
@@ -558,7 +559,7 @@ TEST(NodeTest, PubWithoutAdvertise)
   EXPECT_TRUE(node1.SubscribedTopics().empty());
   EXPECT_TRUE(node1.AdvertisedServices().empty());
 
-  auto pub1 = node1.Advertise(g_topic, msg.GetTypeName());
+  auto pub1 = node1.Advertise(g_topic, std::string(msg.GetTypeName()));
   EXPECT_TRUE(pub1);
 
   auto advertisedTopics = node1.AdvertisedTopics();
@@ -747,7 +748,8 @@ TEST(NodeTest, RawPubSubSameThreadMessageInfo)
   std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
   // Publish a first message.
-  EXPECT_TRUE(pub.PublishRaw(msg.SerializeAsString(), msg.GetTypeName()));
+  EXPECT_TRUE(pub.PublishRaw(msg.SerializeAsString(),
+        std::string(msg.GetTypeName())));
 
   // Give some time to the subscribers.
   std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -758,7 +760,8 @@ TEST(NodeTest, RawPubSubSameThreadMessageInfo)
   reset();
 
   // Publish a second message on topic.
-  EXPECT_TRUE(pub.PublishRaw(msg.SerializeAsString(), msg.GetTypeName()));
+  EXPECT_TRUE(pub.PublishRaw(msg.SerializeAsString(),
+        std::string(msg.GetTypeName())));
 
   // Give some time to the subscribers.
   std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -787,7 +790,8 @@ TEST(NodeTest, RawPubRawSubSameThreadMessageInfo)
   std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
   // Publish a first message.
-  EXPECT_TRUE(pub.PublishRaw(msg.SerializeAsString(), msg.GetTypeName()));
+  EXPECT_TRUE(pub.PublishRaw(msg.SerializeAsString(),
+        std::string(msg.GetTypeName())));
 
   // Give some time to the subscribers.
   std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -798,7 +802,8 @@ TEST(NodeTest, RawPubRawSubSameThreadMessageInfo)
   reset();
 
   // Publish a second message on topic.
-  EXPECT_TRUE(pub.PublishRaw(msg.SerializeAsString(), msg.GetTypeName()));
+  EXPECT_TRUE(pub.PublishRaw(msg.SerializeAsString(),
+        std::string(msg.GetTypeName())));
 
   // Give some time to the subscribers.
   std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -937,6 +942,228 @@ TEST(NodeTest, PubSubSameThreadLambdaMessageInfo)
   cbCondition.wait(lk, [&executed]{return executed;});
 
   EXPECT_TRUE(executed);
+
+  reset();
+}
+
+//////////////////////////////////////////////////
+/// \brief Test the bool operator of the Node::Subscriber class
+TEST(NodeSubTest, BoolOperatorTest)
+{
+  transport::Node node;
+  transport::Node::Subscriber sub;
+  const transport::Node::Subscriber sub_const;
+  EXPECT_FALSE(sub);
+  EXPECT_FALSE(sub_const);
+
+  std::function<void(const msgs::Int32 &)> cb =
+    [](const msgs::Int32 &) {};
+
+  sub = node.CreateSubscriber(g_topic, cb);
+  EXPECT_TRUE(sub);
+
+  EXPECT_TRUE(sub.Unsubscribe());
+  EXPECT_FALSE(sub);
+
+  const transport::Node::Subscriber sub2_const =
+      node.CreateSubscriber(g_topic, cb);
+  EXPECT_TRUE(sub2_const);
+}
+
+//////////////////////////////////////////////////
+/// \brief Subscribe to a topic using CreateSubscriber API
+TEST(NodeTest, PubSubWithCreateSubscriber)
+{
+  reset();
+
+  msgs::Int32 msg;
+  msg.set_data(data);
+
+  transport::Node node;
+
+  auto pub = node.Advertise<msgs::Int32>(g_topic);
+  EXPECT_TRUE(pub);
+
+  std::mutex mutex;
+  std::condition_variable condition;
+
+  bool executed = false;
+  std::function<void(const msgs::Int32&)> subCb =
+    [&executed, &mutex, &condition](const msgs::Int32 &_msg)
+  {
+    EXPECT_EQ(_msg.data(), data);
+    std::lock_guard<std::mutex> lk(mutex);
+    executed = true;
+    condition.notify_all();
+  };
+
+  {
+    transport::Node::Subscriber sub;
+    sub = node.CreateSubscriber(g_topic, subCb);
+    EXPECT_TRUE(sub);
+
+    // Give some time to the subscribers.
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+    // Publish a message.
+    EXPECT_TRUE(pub.Publish(msg));
+
+    // The local publish is asynchronous, which means we need to wait
+    // for the callback.
+    std::unique_lock<std::mutex> lk(mutex);
+    condition.wait(lk, [&executed]{return executed;});
+
+    EXPECT_TRUE(executed);
+  }
+
+  // Publish another message.
+  EXPECT_TRUE(pub.Publish(msg));
+
+  // The subscriber went out of scope so it should have already unsubscribed
+  // to the topic. The callback should not be invoked.
+  std::unique_lock<std::mutex> lk(mutex);
+  condition.wait_for(lk, std::chrono::milliseconds(300),
+                     [&executed]{return executed;});
+
+  reset();
+}
+
+//////////////////////////////////////////////////
+/// \brief Subscribe to a topic using dfferent Subscribe APIs
+TEST(NodeTest, PubSubWithMixedSubscribeAPIs)
+{
+  reset();
+
+  msgs::Int32 msg;
+  msg.set_data(data);
+
+  transport::Node node;
+
+  auto pub = node.Advertise<msgs::Int32>(g_topic);
+  EXPECT_TRUE(pub);
+
+  // Subscriber1: Subscribe to topic using Subscribe(...)
+  std::mutex mutex;
+  std::condition_variable condition;
+  bool executed = false;
+  std::function<void(const msgs::Int32&)> subCb =
+    [&executed, &mutex, &condition](const msgs::Int32 &_msg)
+  {
+    EXPECT_EQ(_msg.data(), data);
+    std::lock_guard<std::mutex> lk(mutex);
+    executed = true;
+    condition.notify_all();
+  };
+  EXPECT_TRUE(node.Subscribe(g_topic, subCb));
+
+  // Subscriber2: Subscribe to topic using CreateSubscriber(...)
+  std::mutex mutex2;
+  std::condition_variable condition2;
+  bool executed2 = false;
+  std::function<void(const msgs::Int32&)> subCb2 =
+    [&executed2, &mutex2, &condition2](const msgs::Int32 &_msg)
+  {
+    EXPECT_EQ(_msg.data(), data);
+    std::lock_guard<std::mutex> lk2(mutex2);
+    executed2 = true;
+    condition2.notify_all();
+  };
+  transport::Node::Subscriber sub2 = node.CreateSubscriber(g_topic, subCb2);
+  EXPECT_TRUE(sub2);
+
+  // Subscriber3: Subscribe to topic using CreateSubscriber(...)
+  std::mutex mutex3;
+  std::condition_variable condition3;
+  bool executed3 = false;
+  std::function<void(const msgs::Int32&)> subCb3 =
+    [&executed3, &mutex3, &condition3](const msgs::Int32 &_msg)
+  {
+    EXPECT_EQ(_msg.data(), data);
+    std::lock_guard<std::mutex> lk2(mutex3);
+    executed3 = true;
+    condition3.notify_all();
+  };
+  transport::Node::Subscriber sub3 = node.CreateSubscriber(g_topic, subCb3);
+  EXPECT_TRUE(sub3);
+
+  // Give some time to the subscribers.
+  std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+  // Publish a message.
+  EXPECT_TRUE(pub.Publish(msg));
+
+  // The local publish is asynchronous, which means we need to wait
+  // for the callback.
+  {
+    std::unique_lock<std::mutex> lk(mutex);
+    condition.wait(lk, [&executed]{return executed;});
+    EXPECT_TRUE(executed);
+
+    std::unique_lock<std::mutex> lk2(mutex2);
+    condition2.wait(lk2, [&executed2]{return executed2;});
+    EXPECT_TRUE(executed2);
+
+    std::unique_lock<std::mutex> lk3(mutex3);
+    condition3.wait(lk3, [&executed3]{return executed3;});
+    EXPECT_TRUE(executed3);
+  }
+
+  executed = false;
+  executed2 = false;
+  executed3 = false;
+
+  // Manually unsubscribe Subscriber2 and verify that the other subscribers
+  // still receive messages
+  EXPECT_TRUE(sub2.Unsubscribe());
+
+  // Publish another message.
+  EXPECT_TRUE(pub.Publish(msg));
+
+  {
+    // Subscriber1 should still receive msgs
+    std::unique_lock<std::mutex> lk(mutex);
+    condition.wait(lk, [&executed]{return executed;});
+    EXPECT_TRUE(executed);
+
+    // Subscriber2 should no longer receive msgs
+    std::unique_lock<std::mutex> lk2(mutex2);
+    condition2.wait_for(lk2, std::chrono::milliseconds(300),
+                        [&executed2]{return executed2;});
+    EXPECT_FALSE(executed2);
+
+    // Subscriber3 should still receive msgs
+    std::unique_lock<std::mutex> lk3(mutex3);
+    condition.wait(lk3, [&executed3]{return executed3;});
+    EXPECT_TRUE(executed3);
+  }
+
+  executed = false;
+  executed2 = false;
+  executed3 = false;
+
+  // Unsubscribe node from topic and verify all subscribers no longer receive
+  // messages
+  EXPECT_TRUE(node.Unsubscribe(g_topic));
+
+  // Publish another message.
+  EXPECT_TRUE(pub.Publish(msg));
+
+  {
+    std::unique_lock<std::mutex> lk(mutex);
+    condition.wait_for(lk, std::chrono::milliseconds(300),
+                       [&executed]{return executed;});
+    EXPECT_FALSE(executed);
+
+    std::unique_lock<std::mutex> lk2(mutex2);
+    condition2.wait_for(lk2, std::chrono::milliseconds(300),
+                        [&executed2]{return executed2;});
+    EXPECT_FALSE(executed2);
+
+    std::unique_lock<std::mutex> lk3(mutex3);
+    condition3.wait_for(lk3, std::chrono::milliseconds(300),
+                        [&executed3]{return executed3;});
+    EXPECT_FALSE(executed3);
+  }
 
   reset();
 }
@@ -1752,7 +1979,7 @@ TEST(NodeTest, ServiceCallWithoutInputSyncTimeout)
 
 //////////////////////////////////////////////////
 /// \brief Create a publisher that sends messages "forever". This function will
-/// be used emiting a SIGINT or SIGTERM signal, to make sure that the transport
+/// be used emitting a SIGINT or SIGTERM signal, to make sure that the transport
 /// library captures the signals, stop all the tasks and signal the event with
 /// the method Interrupted().
 void createInfinitePublisher()

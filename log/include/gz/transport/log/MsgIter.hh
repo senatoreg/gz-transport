@@ -50,10 +50,12 @@ namespace gz
         /// \brief Destructor;
         public: ~MsgIter();
 
+        /// \cond
         /// \brief Copy-assignment operator
         /// \param[in] _orig the instance being copied
         /// \return a reference to this instance
         // public: MsgIter &operator=(const MsgIter &_orig);
+        /// \endcond
 
         /// \brief Prefix increment
         /// \return a reference to this instance
@@ -69,7 +71,7 @@ namespace gz
         /// \return false if the two iterator point to the same message
         public: bool operator!=(const MsgIter &_other) const;
 
-        /// \brief Move assignement operator
+        /// \brief Move assignment operator
         /// \param[in] _other the new iterator replacing the current one
         /// \return The updated MsgIter.
         public: MsgIter& operator=(MsgIter &&_other); // NOLINT

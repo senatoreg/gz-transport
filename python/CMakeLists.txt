@@ -1,6 +1,7 @@
+cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
+
 # Detect if we are doing a standalone build of the bindings, using an external gz-transport
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
-  cmake_minimum_required(VERSION 3.22.1)
   find_package(gz-cmake4 4.1.0 REQUIRED)
   gz_get_package_xml_version(${CMAKE_SOURCE_DIR}/../package.xml PACKAGE_XML)
   project(gz-transport${PACKAGE_XML_VERSION_MAJOR}-python VERSION ${PACKAGE_XML_VERSION})
@@ -100,6 +101,7 @@ if (BUILD_TESTING AND NOT WIN32)
     endif()
     set(_env_vars)
     list(APPEND _env_vars "CMAKE_BINARY_DIR=${CMAKE_BINARY_DIR}/bin")
+    list(APPEND _env_vars "GZ_IP=127.0.0.1")
     list(APPEND _env_vars "PYTHONPATH=${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/python/:${CMAKE_BINARY_DIR}/lib:$ENV{PYTHONPATH}")
     list(APPEND _env_vars "LD_LIBRARY_PATH=${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}:$ENV{LD_LIBRARY_PATH}")
     set_tests_properties(${test}.py PROPERTIES

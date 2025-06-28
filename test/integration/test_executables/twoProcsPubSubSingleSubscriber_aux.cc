@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014 Open Source Robotics Foundation
+ * Copyright (C) 2025 Open Source Robotics Foundation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
  * limitations under the License.
  *
 */
-#include <gz/msgs/int32.pb.h>
+#include <gz/msgs/vector3d.pb.h>
 
 #include <chrono>
 #include <string>
@@ -29,41 +29,74 @@
 using namespace gz;
 
 static bool cbExecuted;
+static bool cbRawExecuted;
 static std::string g_topic = "/foo"; // NOLINT(*)
-static int data = 5;
 
 //////////////////////////////////////////////////
 /// \brief Function is called every time a topic update is received.
-void cb(const msgs::Int32 &_msg)
+void cb(const msgs::Vector3d &_msg)
 {
-  EXPECT_EQ(_msg.data(), data);
+  EXPECT_DOUBLE_EQ(_msg.x(), 1.0);
+  EXPECT_DOUBLE_EQ(_msg.y(), 2.0);
+  EXPECT_DOUBLE_EQ(_msg.z(), 3.0);
   cbExecuted = true;
 }
 
 //////////////////////////////////////////////////
-void subscriber()
+void cbRaw(const char *_msgData, const size_t _size,
+           const transport::MessageInfo &_info)
 {
-  cbExecuted = false;
-  transport::Node node;
+  msgs::Vector3d v;
 
-  EXPECT_TRUE(node.Subscribe(g_topic, cb));
+  EXPECT_TRUE(v.GetTypeName() == _info.Type());
 
-  int i = 0;
-  while (i < 100 && !cbExecuted)
-  {
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    ++i;
-  }
+  EXPECT_TRUE(v.ParseFromArray(_msgData, _size));
 
-  // Check that the message was not received because the scope was Process.
-  EXPECT_FALSE(cbExecuted);
-  cbExecuted = false;
+  EXPECT_DOUBLE_EQ(v.x(), 1.0);
+  EXPECT_DOUBLE_EQ(v.y(), 2.0);
+  EXPECT_DOUBLE_EQ(v.z(), 3.0);
+
+  cbRawExecuted = true;
 }
 
 //////////////////////////////////////////////////
-TEST(ScopedTopicTest, SubscriberTest)
+void runSubscriber()
 {
-  subscriber();
+  cbExecuted = false;
+  cbRawExecuted = false;
+
+  transport::Node node;
+
+  // Add one normal subscription to `node`
+  EXPECT_TRUE(node.Subscribe(g_topic, cb));
+
+  // Add a raw subscription to `node`
+  EXPECT_TRUE(node.SubscribeRaw(g_topic, cbRaw,
+                                std::string(msgs::Vector3d().GetTypeName())));
+
+  int interval = 100;
+
+  // Wait until we've received at least one message.
+  while (!cbExecuted || !cbRawExecuted)
+  {
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    interval--;
+
+    if (interval == 0)
+      break;
+  }
+
+  EXPECT_TRUE(node.Unsubscribe(g_topic));
+
+  // Check that the message was received.
+  EXPECT_TRUE(cbExecuted);
+  EXPECT_TRUE(cbRawExecuted);
+}
+
+//////////////////////////////////////////////////
+TEST(twoProcPubSub, PubSubTwoProcsTwoNodesSingleSubscriber)
+{
+  runSubscriber();
 }
 
 //////////////////////////////////////////////////
@@ -77,6 +110,7 @@ int main(int argc, char **argv)
 
   // Set the partition name for this test.
   gz::utils::setenv("GZ_PARTITION", argv[1]);
+  gz::utils::setenv("GZ_TRANSPORT_TOPIC_STATISTICS", "1");
 
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

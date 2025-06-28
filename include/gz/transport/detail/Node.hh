@@ -24,6 +24,8 @@
 #include <string>
 #include <utility>
 
+#include "gz/transport/Node.hh"
+
 namespace gz
 {
   namespace transport
@@ -34,12 +36,93 @@ namespace gz
         const std::string &_topic,
         const AdvertiseMessageOptions &_options)
     {
-      return this->Advertise(_topic, MessageT().GetTypeName(), _options);
+      return this->Advertise(_topic,
+          std::string(MessageT().GetTypeName()), _options);
     }
 
     //////////////////////////////////////////////////
     template<typename MessageT>
     bool Node::Subscribe(
+        const std::string &_topic,
+        void(*_cb)(const MessageT &_msg),
+        const SubscribeOptions &_opts)
+    {
+      return this->SubscribeImpl(_topic, _cb, _opts) != nullptr;
+    }
+
+    //////////////////////////////////////////////////
+    template<typename MessageT>
+    bool Node::Subscribe(
+        const std::string &_topic,
+        std::function<void(const MessageT &_msg)> _cb,
+        const SubscribeOptions &_opts)
+    {
+      return this->SubscribeImpl(_topic, _cb, _opts) != nullptr;
+    }
+
+    //////////////////////////////////////////////////
+    template<typename ClassT, typename MessageT>
+    bool Node::Subscribe(
+        const std::string &_topic,
+        void(ClassT::*_cb)(const MessageT &_msg),
+        ClassT *_obj,
+        const SubscribeOptions &_opts)
+    {
+      return this->SubscribeImpl(_topic, _cb, _obj, _opts) != nullptr;
+    }
+
+    //////////////////////////////////////////////////
+    template<typename MessageT>
+    bool Node::Subscribe(
+        const std::string &_topic,
+        void(*_cb)(const MessageT &_msg, const MessageInfo &_info),
+        const SubscribeOptions &_opts)
+    {
+      return this->SubscribeImpl(_topic, _cb, _opts) != nullptr;
+    }
+
+    //////////////////////////////////////////////////
+    template<typename MessageT>
+    bool Node::Subscribe(
+        const std::string &_topic,
+        std::function<void(const MessageT &_msg,
+                           const MessageInfo &_info)> _cb,
+        const SubscribeOptions &_opts)
+    {
+      return this->SubscribeImpl(_topic, _cb, _opts) != nullptr;
+    }
+
+    //////////////////////////////////////////////////
+    template<typename ClassT, typename MessageT>
+    bool Node::Subscribe(
+        const std::string &_topic,
+        void(ClassT::*_cb)(const MessageT &_msg, const MessageInfo &_info),
+        ClassT *_obj,
+        const SubscribeOptions &_opts)
+    {
+      return this->SubscribeImpl(_topic, _cb, _obj, _opts) != nullptr;
+    }
+
+    //////////////////////////////////////////////////
+    template <typename ...Args>
+    Node::Subscriber Node::CreateSubscriber(const std::string &_topic,
+                                            Args && ...args)
+    {
+      auto handler = this->SubscribeImpl(_topic,
+                                         std::forward<Args>(args)...);
+      if (handler && !handler->HandlerUuid().empty())
+      {
+        return Node::Subscriber(_topic,
+                                handler->NodeUuid(),
+                                this->Options(),
+                                handler->HandlerUuid());
+      }
+      return Node::Subscriber();
+    }
+
+    //////////////////////////////////////////////////
+    template<typename MessageT>
+    std::shared_ptr<SubscriptionHandler<MessageT>> Node::SubscribeImpl(
         const std::string &_topic,
         void(*_cb)(const MessageT &_msg),
         const SubscribeOptions &_opts)
@@ -51,12 +134,12 @@ namespace gz
         (*_cb)(_internalMsg);
       };
 
-      return this->Subscribe<MessageT>(_topic, f, _opts);
+      return this->SubscribeImpl<MessageT>(_topic, f, _opts);
     }
 
     //////////////////////////////////////////////////
     template<typename MessageT>
-    bool Node::Subscribe(
+    std::shared_ptr<SubscriptionHandler<MessageT>> Node::SubscribeImpl(
         const std::string &_topic,
         std::function<void(const MessageT &_msg)> _cb,
         const SubscribeOptions &_opts)
@@ -68,12 +151,12 @@ namespace gz
         cb(_internalMsg);
       };
 
-      return this->Subscribe<MessageT>(_topic, f, _opts);
+      return this->SubscribeImpl<MessageT>(_topic, f, _opts);
     }
 
     //////////////////////////////////////////////////
     template<typename ClassT, typename MessageT>
-    bool Node::Subscribe(
+    std::shared_ptr<SubscriptionHandler<MessageT>> Node::SubscribeImpl(
         const std::string &_topic,
         void(ClassT::*_cb)(const MessageT &_msg),
         ClassT *_obj,
@@ -87,12 +170,12 @@ namespace gz
         cb(_internalMsg);
       };
 
-      return this->Subscribe<MessageT>(_topic, f, _opts);
+      return this->SubscribeImpl<MessageT>(_topic, f, _opts);
     }
 
     //////////////////////////////////////////////////
     template<typename MessageT>
-    bool Node::Subscribe(
+    std::shared_ptr<SubscriptionHandler<MessageT>> Node::SubscribeImpl(
         const std::string &_topic,
         void(*_cb)(const MessageT &_msg, const MessageInfo &_info),
         const SubscribeOptions &_opts)
@@ -104,12 +187,12 @@ namespace gz
         (*_cb)(_internalMsg, _internalInfo);
       };
 
-      return this->Subscribe<MessageT>(_topic, f, _opts);
+      return this->SubscribeImpl<MessageT>(_topic, f, _opts);
     }
 
     //////////////////////////////////////////////////
     template<typename MessageT>
-    bool Node::Subscribe(
+    std::shared_ptr<SubscriptionHandler<MessageT>> Node::SubscribeImpl(
         const std::string &_topic,
         std::function<void(const MessageT &_msg,
                            const MessageInfo &_info)> _cb,
@@ -124,7 +207,7 @@ namespace gz
         this->Options().NameSpace(), topic, fullyQualifiedTopic))
       {
         std::cerr << "Topic [" << topic << "] is not valid." << std::endl;
-        return false;
+        return nullptr;
       }
 
       // Create a new subscription handler.
@@ -143,12 +226,15 @@ namespace gz
       this->Shared()->localSubscribers.normal.AddHandler(
         fullyQualifiedTopic, this->NodeUuid(), subscrHandlerPtr);
 
-      return this->SubscribeHelper(fullyQualifiedTopic);
+      if (!this->SubscribeHelper(fullyQualifiedTopic))
+        return nullptr;
+
+      return subscrHandlerPtr;
     }
 
     //////////////////////////////////////////////////
     template<typename ClassT, typename MessageT>
-    bool Node::Subscribe(
+    std::shared_ptr<SubscriptionHandler<MessageT>> Node::SubscribeImpl(
         const std::string &_topic,
         void(ClassT::*_cb)(const MessageT &_msg, const MessageInfo &_info),
         ClassT *_obj,
@@ -163,7 +249,7 @@ namespace gz
         cb(_internalMsg, _internalInfo);
       };
 
-      return this->Subscribe<MessageT>(_topic, f, _opts);
+      return this->SubscribeImpl<MessageT>(_topic, f, _opts);
     }
 
     //////////////////////////////////////////////////
@@ -267,7 +353,8 @@ namespace gz
         this->Shared()->myReplierAddress,
         this->Shared()->replierId.ToString(),
         this->Shared()->pUuid, this->NodeUuid(),
-        RequestT().GetTypeName(), ReplyT().GetTypeName(), _options);
+        std::string(RequestT().GetTypeName()),
+        std::string(ReplyT().GetTypeName()), _options);
 
       if (!this->Shared()->AdvertisePublisher(publisher))
       {
@@ -420,8 +507,8 @@ namespace gz
         std::lock_guard<std::recursive_mutex> lk(this->Shared()->mutex);
         localResponserFound = this->Shared()->repliers.FirstHandler(
               fullyQualifiedTopic,
-              RequestT().GetTypeName(),
-              ReplyT().GetTypeName(),
+              std::string(RequestT().GetTypeName()),
+              std::string(ReplyT().GetTypeName()),
               repHandler);
       }
 
@@ -458,7 +545,8 @@ namespace gz
         if (this->Shared()->TopicPublishers(fullyQualifiedTopic, addresses))
         {
           this->Shared()->SendPendingRemoteReqs(fullyQualifiedTopic,
-            RequestT().GetTypeName(), ReplyT().GetTypeName());
+            std::string(RequestT().GetTypeName()),
+            std::string(ReplyT().GetTypeName()));
         }
         else
         {
@@ -551,7 +639,8 @@ namespace gz
       // If the responser is within my process.
       IRepHandlerPtr repHandler;
       if (this->Shared()->repliers.FirstHandler(fullyQualifiedTopic,
-        _request.GetTypeName(), _reply.GetTypeName(), repHandler))
+        std::string(_request.GetTypeName()),
+        std::string(_reply.GetTypeName()), repHandler))
       {
         // There is a responser in my process, let's use it.
         _result = repHandler->RunLocalCallback(_request, _reply);
@@ -567,7 +656,8 @@ namespace gz
       if (this->Shared()->TopicPublishers(fullyQualifiedTopic, addresses))
       {
         this->Shared()->SendPendingRemoteReqs(fullyQualifiedTopic,
-          _request.GetTypeName(), _reply.GetTypeName());
+          std::string(_request.GetTypeName()),
+          std::string(_reply.GetTypeName()));
       }
       else
       {

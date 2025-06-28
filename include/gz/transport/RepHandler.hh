@@ -237,13 +237,13 @@ namespace gz
       // Documentation inherited.
       public: virtual std::string ReqTypeName() const
       {
-        return Req().GetTypeName();
+        return std::string(Req().GetTypeName());
       }
 
       // Documentation inherited.
       public: virtual std::string RepTypeName() const
       {
-        return Rep().GetTypeName();
+        return std::string(Rep().GetTypeName());
       }
 
       /// \brief Create a specific protobuf message given its serialized data.
@@ -252,7 +252,7 @@ namespace gz
       private: std::shared_ptr<Req> CreateMsg(const std::string &_data) const
       {
         // Instantiate a specific protobuf message
-        std::shared_ptr<Req> msgPtr(new Req());
+        auto msgPtr = std::make_shared<Req>();
 
         // Create the message using some serialized data
         if (!msgPtr->ParseFromString(_data))
