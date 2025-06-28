@@ -1,14 +1,5 @@
-gz-transport (14.0.1-1) UNRELEASED; urgency=medium
+gz-transport (14.1.0-1) UNRELEASED; urgency=medium
 
   * Initial release.
-  * New upstream release.
-  * New upstream release.
-  * New upstream release.
-  * New upstream release.
-  * New upstream release.
-  * New upstream release.
-  * New upstream release.
-  * New upstream release.
-  * New upstream release.
 
- -- Giovanni Senatore <giovanni.senatore@gmail.com>  Mon, 24 Feb 2025 18:32:27 +0100
+ -- Giovanni Senatore <giovanni.senatore@gmail.com>  Sat, 28 Jun 2025 11:55:23 +0200
