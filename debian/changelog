@@ -1,5 +1,5 @@
-gz-transport (14.1.0-1) UNRELEASED; urgency=medium
+gz-transport (15.0.2-1) UNRELEASED; urgency=medium
 
   * Initial release.
 
- -- Giovanni Senatore <giovanni.senatore@gmail.com>  Sat, 28 Jun 2025 11:55:23 +0200
+ -- Giovanni Senatore <giovanni.senatore@gmail.com>  Tue, 17 Feb 2026 09:22:38 +0100
