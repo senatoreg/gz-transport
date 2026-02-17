@@ -2,7 +2,7 @@ diff --git a/src/cmd/CMakeLists.txt b/src/cmd/CMakeLists.txt
 index b2595b2f..d8a04d1e 100644
 --- a/src/cmd/CMakeLists.txt
 +++ b/src/cmd/CMakeLists.txt
-@@ -4,9 +4,9 @@ gz_get_libsources_and_unittests(sources gtest_sources)
+@@ -4,9 +4,9 @@
  
  # Skip command line tests for Windows, see
  # https://github.com/gazebosim/gz-transport/issues/104
@@ -14,7 +14,7 @@ index b2595b2f..d8a04d1e 100644
  
  if (NOT HAVE_GZ_TOOLS)
    list(REMOVE_ITEM gtest_sources gz_TEST.cc)
-@@ -59,20 +59,20 @@ foreach(test ${test_list})
+@@ -75,20 +75,20 @@
      )
  endforeach()
  
@@ -47,5 +47,5 @@ index b2595b2f..d8a04d1e 100644
 +#  )
 +#endif()
  
- #===============================================================================
- # Generate the ruby script for internal testing.
+ if (TARGET UNIT_gz_src_TEST)
+   set(_env_vars)
