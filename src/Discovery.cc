@@ -19,7 +19,7 @@
 
 #include <vector>
 
-#include "gz/transport/Discovery.hh"
+#include "Discovery.hh"
 
 // Compatibility macro for ZMQ_FD_T
 #if (ZMQ_VERSION >= 40303)
@@ -38,12 +38,9 @@
   #endif
 #endif
 
-namespace gz
+namespace gz::transport
 {
-namespace transport
-{
-inline namespace GZ_TRANSPORT_VERSION_NAMESPACE
-{
+inline namespace GZ_TRANSPORT_VERSION_NAMESPACE {
   /////////////////////////////////////////////////
   bool pollSockets(const std::vector<int> &_sockets, const int _timeout)
   {
@@ -65,6 +62,5 @@ inline namespace GZ_TRANSPORT_VERSION_NAMESPACE
     // Return if we got a reply.
     return items[0].revents & ZMQ_POLLIN;
   }
-}
-}
-}
+}  // namespace GZ_TRANSPORT_VERSION_NAMESPACE
+}  // namespace gz::transport

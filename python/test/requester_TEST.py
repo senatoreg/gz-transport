@@ -13,9 +13,10 @@
 # limitations under the License.
 #
 
-from gz.msgs11.int32_pb2 import Int32
-from gz.msgs11.stringmsg_pb2 import StringMsg
-from gz.transport14 import Node
+from gz.msgs.int32_pb2 import Int32
+from gz.msgs.stringmsg_pb2 import StringMsg
+from gz.transport import Node
+from gz.transport import transport_implementation
 
 import os
 import subprocess
@@ -23,6 +24,8 @@ import unittest
 
 
 class RequesterTEST(unittest.TestCase):
+    @unittest.skipIf(transport_implementation() == "zenoh",
+                     "transport implementation 'zenoh' is not supported")
     def setUp(self):
         # Environment Setup
         gz_partition = "python_requester_test"

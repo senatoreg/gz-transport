@@ -6,6 +6,95 @@ Deprecated code produces compile-time warnings. These warning serve as
 notification to users that their code should be upgraded. The next major
 release will remove the deprecated code.
 
+## Gazebo Transport 14.X to 15.X
+
+### Removed
+
+1. The `Discovery.hh` file is no longer installed.
+    * [GitHub pull request 630](https://github.com/gazebosim/gz-transport/pull/630)
+
+1. The following function in `Node.hh` has been removed:
+  ```cpp
+  bool TopicInfo(const std::string &_topic,
+                 std::vector<MessagePublisher> &_publishers) const;
+  ```
+  and was replaced with:
+  ```cpp
+  bool TopicInfo(const std::string &_topic,
+                 std::vector<MessagePublisher> &_publishers,
+                 std::vector<MessagePublisher> &_subscribers) const;
+  ```
+
+1. The following functions in `CIface.h` have been removed:
+  ```cpp
+  const auto ignTransportNodeCreate(...);
+  const auto ignTransportNodeDestroy(...);
+  const auto ignTransportAdvertise(...);
+  const auto ignTransportPublish(...);
+  const auto ignTransportSubscribe(...);
+  const auto ignTransportSubscribeOptions(...);
+  const auto ignTransportSubscribeNonConst(...);
+  const auto ignTransportUnsubscribe(...);
+  const auto ignTransportWaitForShutdown(...);
+  ```
+  and were replaced with:
+  ```cpp
+  const auto gzTransportNodeCreate(...);
+  const auto gzTransportNodeDestroy(...);
+  const auto gzTransportAdvertise(...);
+  const auto gzTransportPublish(...);
+  const auto gzTransportSubscribe(...);
+  const auto gzTransportSubscribeOptions(...);
+  const auto gzTransportSubscribeNonConst(...);
+  const auto gzTransportUnsubscribe(...);
+  const auto gzTransportWaitForShutdown(...);
+  ```
+
+### Breaking Changes
+
+1. The `RepHandler.hh::IRepHandler` constructor now
+   requires two parameters (process UUID, and  node UUID). The new signature is:
+   ```cpp
+   IRepHandler(
+     const std::string &_pUuid,
+     const std::string &_nUuid);
+   ```
+   * [GitHub pull request 657](https://github.com/gazebosim/gz-transport/pull/657)
+
+1. The `SubscriptionHandler.hh::SubscriptionHandlerBase` constructor now
+   requires a new parameter (process UUID). The new signature is:
+   ```cpp
+   SubscriptionHandlerBase(
+     const std::string &_pUuid,
+     const std::string &_nUuid,
+     const SubscribeOptions &_opts = SubscribeOptions());
+   ```
+   * [GitHub pull request 630](https://github.com/gazebosim/gz-transport/pull/630)
+
+1. All variants of the `bool Node::Subscribe` functions are combined into
+   one `bool Subscribe(Args && ...args)` function that forwards arguments to
+   various `Node::SubscribeImpl` private helper functions. All existing
+   `Node::Subscribe` calls should continue to work without code changes.
+   One exception is when the subscribe callback function is an overloaded
+   function, e.g.
+   ```cpp
+   void cb(const msgs::StringMsg_V &_msg);
+   void cb(const msgs::StringMsg_V &_res, const bool _result);
+   ...
+   bool res = node.Subscribe(topic, cb);
+   ```
+   This will now result in a compile error. The fix is to use unique callback
+   function names, eg.
+   ```cpp
+   void topicCb(const msgs::StringMsg_V &_msg);
+   void serviceCb(const msgs::StringMsg_V &_res, const bool _result);
+   ...
+   bool res = node.Subscribe(topic, topicCb);
+   ```
+
+2. The `parameters` registry no longer replaces `gz.msgs` message namespaces
+   with `gz_msgs`.
+
 ## Gazebo Transport 11.X to 12.X
 
 ### Deprecated

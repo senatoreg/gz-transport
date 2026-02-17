@@ -38,24 +38,41 @@ using namespace transport;
 //////////////////////////////////////////////////
 extern "C" void cmdParametersList(const char * _ns)
 {
+  if (!_ns)
+  {
+    std::cerr << "Error: Namespace is null" << std::endl;
+    return;
+  }
   parameters::ParametersClient client{_ns};
 
   std::cout << std::endl << "Listing parameters, registry namespace [" << _ns
             << "]..." << std::endl << std::endl;
-
-  auto res = client.ListParameters();
-  if (!res.parameter_declarations_size()) {
-    std::cout << "No parameters available" << std::endl;
-    return;
-  }
-  for (const auto & decl : res.parameter_declarations()) {
-    std::cout << decl.name() << "            [" << decl.type() << "]"
-              << std::endl;
+  try {
+    auto res = client.ListParameters();
+    if (!res.parameter_declarations_size()) {
+      std::cout << "No parameters available" << std::endl;
+      return;
+    }
+    for (const auto & decl : res.parameter_declarations()) {
+      std::cout << decl.name() << "            [" << decl.type() << "]"
+                << std::endl;
+    }
+  } catch (const std::runtime_error& e) {
+    std::cerr << "Error listing parameters: " << e.what() << std::endl;
+    std::cerr << "\nPossible causes:" << std::endl;
+    std::cerr << "1. Parameter server not running" << std::endl;
+    std::cerr << "2. Invalid namespace: '" << _ns << "'" << std::endl;
+    std::cerr << "3. Network communication issue" << std::endl;
   }
 }
 
 //////////////////////////////////////////////////
 extern "C" void cmdParameterGet(const char * _ns, const char *_paramName) {
+  if (!_ns || !_paramName)
+  {
+    std::cerr << "Error: Namespace or parameter name is null" << std::endl;
+    return;
+  }
   parameters::ParametersClient client{_ns};
 
   std::cout << std::endl << "Getting parameter [" << _paramName
@@ -89,6 +106,16 @@ extern "C" void cmdParameterSet(
     const char * _ns, const char *_paramName, const char * _paramType,
     const char *_paramValue)
 {
+  if (!_ns || !_paramName)
+  {
+    std::cerr << "Error: Namespace or parameter name is null" << std::endl;
+    return;
+  }
+  if (!_paramType || !_paramValue)
+  {
+    std::cerr << "Error: Parameter type or value is null" << std::endl;
+    return;
+  }
   parameters::ParametersClient client{_ns};
 
   std::cout << std::endl << "Setting parameter [" << _paramName

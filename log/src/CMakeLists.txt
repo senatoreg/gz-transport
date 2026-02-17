@@ -1,10 +1,14 @@
 gz_get_libsources_and_unittests(sources gtest_sources)
-list(APPEND sources cmd/LogCommandAPI.cc)
 
 gz_add_component(log SOURCES ${sources} GET_TARGET_NAME log_lib_target)
 
 target_link_libraries(${log_lib_target}
   PRIVATE SQLite3::SQLite3)
+
+if (HAVE_ZENOH)
+  target_link_libraries(${log_lib_target}
+    PRIVATE zenohcxx::zenohc)
+endif()
 
 if (MSVC)
   # Warning #4251 is the "dll-interface" warning that tells you when types used
@@ -59,6 +63,4 @@ target_include_directories(${log_lib_target}
     # while being built.
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>")
 
-if(NOT WIN32)
-  add_subdirectory(cmd)
-endif()
+add_subdirectory(cmd)

@@ -29,7 +29,6 @@
 #include <thread>
 
 #include <gz/transport/Clock.hh>
-#include <gz/transport/Discovery.hh>
 #include <gz/transport/log/Log.hh>
 #include <gz/transport/log/Recorder.hh>
 #include <gz/transport/MessageInfo.hh>
@@ -37,6 +36,7 @@
 #include <gz/transport/TransportTypes.hh>
 
 #include "Console.hh"
+#include "../../src/Discovery.hh"
 #include "raii-sqlite3.hh"
 #include "build_config.hh"
 
@@ -199,7 +199,19 @@ Recorder::Implementation::Implementation()
   };
 
   this->discovery->ConnectionsCb(cb);
-  this->discovery->Start();
+  if (shared->GzImplementation() == "zeromq")
+  {
+    this->discovery->Start();
+  }
+  else if (shared->GzImplementation() == "zenoh")
+  {
+#ifdef HAVE_ZENOH
+    this->discovery->Start(shared->Session(),
+                           std::bind(&MsgDiscovery::LivelinessMsgDataHandler,
+                                     this->discovery.get(),
+                                     std::placeholders::_1));
+#endif
+  }
 }
 
 //////////////////////////////////////////////////

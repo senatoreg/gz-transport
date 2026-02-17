@@ -18,14 +18,25 @@ target_link_libraries(gz
   ${PROJECT_LIBRARY_TARGET_NAME}
 )
 
+if (HAVE_ZENOH)
+  target_link_libraries(gz
+    zenohcxx::zenohc
+  )
+endif()
+
 # Build topic CLI executable
 set(topic_executable gz-transport-topic)
 add_executable(${topic_executable} topic_main.cc)
 target_link_libraries(${topic_executable}
   gz
-  gz-utils${GZ_UTILS_VER}::cli
+  gz-utils::cli
   ${PROJECT_LIBRARY_TARGET_NAME}
 )
+if (HAVE_ZENOH)
+  target_link_libraries(${topic_executable}
+    zenohcxx::zenohc
+  )
+endif()
 install(TARGETS ${topic_executable} DESTINATION ${CMAKE_INSTALL_LIBEXECDIR}/gz/${GZ_DESIGNATION}${PROJECT_VERSION_MAJOR}/)
 
 # Build service CLI executable
@@ -33,9 +44,14 @@ set(service_executable gz-transport-service)
 add_executable(${service_executable} service_main.cc)
 target_link_libraries(${service_executable}
   gz
-  gz-utils${GZ_UTILS_VER}::cli
+  gz-utils::cli
   ${PROJECT_LIBRARY_TARGET_NAME}
 )
+if (HAVE_ZENOH)
+  target_link_libraries(${service_executable}
+    zenohcxx::zenohc
+  )
+endif()
 install(TARGETS ${service_executable} DESTINATION ${CMAKE_INSTALL_LIBEXECDIR}/gz/${GZ_DESIGNATION}${PROJECT_VERSION_MAJOR}/)
 
 # Build the unit tests.
@@ -43,7 +59,7 @@ gz_build_tests(TYPE UNIT SOURCES ${gtest_sources}
   TEST_LIST test_list
   LIB_DEPS
     gz
-    gz-utils${GZ_UTILS_VER}::gz-utils${GZ_UTILS_VER}
+    gz-utils::gz-utils
     ${EXTRA_TEST_LIB_DEPS} test_config)
 
 foreach(test ${test_list})
@@ -71,6 +87,14 @@ if (TARGET UNIT_gz_TEST)
     PROPERTIES
     ENVIRONMENT
       "${_env_vars}"
+  )
+endif()
+
+if (TARGET UNIT_gz_src_TEST)
+  set(_env_vars)
+  list(APPEND _env_vars "GZ_IP=127.0.0.1")
+  set_tests_properties(UNIT_gz_src_TEST
+    PROPERTIES ENVIRONMENT "${_env_vars}"
   )
 endif()
 

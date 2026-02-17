@@ -4,6 +4,9 @@ Previous Tutorial: \ref development
 
 ## Overview
 
+**Note: This feature is only available when using the zeromq middleware
+backend.**
+
 Topic statistics provides a mechanism to quantify transport performance
 between a publisher and subscriber. When enabled, a subscriber on a topic
 can measure:
@@ -37,14 +40,14 @@ for both publishers and subscribers. Setting `GZ_TRANSPORT_TOPIC_STATISTICS` to 
 Additionally, a node on the subscriber side of a pub/sub relationship must
 call `EnableStats`. For example:
 
-```c++
+```{.cpp}
 if (!node.EnableStats(topic, true))
 {
   std::cout << "Unable to enable stats\n";
 }
 ```
 
-A complete example can be found in the [subscriber_stats example program](https://github.com/gazebosim/gz-transport/blob/gz-transport14/example/subscriber_stats.cc).
+A complete example can be found in the [subscriber_stats example program](https://github.com/gazebosim/gz-transport/blob/main/example/subscriber_stats.cc).
 
 With both `GZ_TRANSPORT_TOPIC_STATISTICS` set to `1` and a node
 enabling topic statistics, then you will be able to echo statistic
@@ -54,7 +57,7 @@ It is possible to change the statistics output topic from `/statistics` to
 one of your choosing by specifying a topic name when enabling topic
 statistics. For example:
 
-```c++
+```{.cpp}
 if (!node.EnableStats(topic, true, "/my_stats"))
 {
   std::cout << "Unable to enable stats\n";
@@ -64,7 +67,7 @@ if (!node.EnableStats(topic, true, "/my_stats"))
 You can also change the statistics publication rate from 1Hz by specifying
 the new Hz rate after the statistic's topic name:
 
-```c++
+```{.cpp}
 if (!node.EnableStats(topic, true, "/my_stats", 100))
 {
   std::cout << "Unable to enable stats\n";
@@ -75,8 +78,8 @@ if (!node.EnableStats(topic, true, "/my_stats", 100))
 
 For running the example, build the binaries in the example directory:
 
-```
-git clone https://github.com/gazebosim/gz-transport -b gz-transport14
+```{.sh}
+git clone https://github.com/gazebosim/gz-transport -b main
 cd gz-transport/example
 cmake -S . -B build
 # For UNIX
@@ -86,13 +89,13 @@ cmake --build build --config release --parallel
 ```
 
 #### Executing
-> **NOTE**
-> It is essential to have a valid value of `GZ_PARTITION` environment variable
-> and to have it set to the same value in all open terminals. As `GZ_PARTITION`
-> is based on hostname and username, especially Windows and Mac users might
-> have problems due to spaces in their username, which are not a valid character
-> in `GZ_PARTITION`. gz-transport prints error `Invalid partition name` in such
-> case. To resolve that, set `GZ_PARTITION` explicitly to a valid value.
+**NOTE:**
+It is essential to have a valid value of `GZ_PARTITION` environment variable
+and to have it set to the same value in all open terminals. As `GZ_PARTITION`
+is based on hostname and username, especially Windows and Mac users might
+have problems due to spaces in their username, which are not a valid character
+in `GZ_PARTITION`. gz-transport prints error `Invalid partition name` in such
+case. To resolve that, set `GZ_PARTITION` explicitly to a valid value.
 
 If you have the Gazebo Transport sources with the example programs built,
 then you can test topic statistics by following these steps depending on the

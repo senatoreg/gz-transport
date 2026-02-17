@@ -66,6 +66,7 @@
 #include <mutex>
 #include <string>
 #include <thread>
+#include <utility>
 #include <vector>
 
 #include <gz/msgs/Utility.hh>
@@ -76,7 +77,12 @@
 #include "gz/transport/NetUtils.hh"
 #include "gz/transport/Publisher.hh"
 #include "gz/transport/TopicStorage.hh"
+#include "gz/transport/TopicUtils.hh"
 #include "gz/transport/TransportTypes.hh"
+
+#ifdef HAVE_ZENOH
+#include <zenoh.hxx>
+#endif
 
 namespace gz
 {
@@ -151,6 +157,11 @@ namespace gz
           // Get the list of network interfaces in this host.
           this->hostInterfaces = determineInterfaces();
         }
+
+        // Update the wire version if GZ_TRANSPORT_TOPIC_STATISTICS is set.
+        std::string gzStats;
+        if (env("GZ_TRANSPORT_TOPIC_STATISTICS", gzStats) && gzStats == "1")
+          this->wireVersion += 100;
 
 #ifdef _WIN32
         WORD wVersionRequested;
@@ -277,6 +288,147 @@ namespace gz
         }
       }
 
+#ifdef HAVE_ZENOH
+      //////////////////////////////////////////////////
+      public: void LivelinessMsgDataHandler(const zenoh::Sample &_sample)
+      {
+        DiscoveryCallback<Pub> cb;
+        std::string token{_sample.get_keyexpr().as_string_view()};
+        std::string prefix;
+        std::string partition;
+        std::string topic;
+        std::string pUUID;
+        std::string nUUID;
+        std::string entityType;
+        std::string msgType;
+        if (!TopicUtils::DecomposeLivelinessToken(
+          token, prefix, partition, topic, pUUID, nUUID, entityType, msgType))
+        {
+          return;
+        };
+
+        MessagePublisher pub(
+          "@" + partition + "@" + topic, "", this->pUuid, pUUID, nUUID, msgType,
+          AdvertiseMessageOptions());
+
+        {
+          std::lock_guard<std::mutex> lock(this->mutex);
+
+          if (_sample.get_kind() == Z_SAMPLE_KIND_PUT)
+          {
+            if (entityType == "MP")
+            {
+              if (!this->info.AddPublisher(pub))
+                return;
+
+              cb = this->connectionCb;
+            }
+            else if (entityType == "MS" && this->pUuid != pUUID)
+            {
+              this->remoteSubscribers.AddPublisher(pub);
+              // TODO(azeey) Should not call this callbacks while we have the
+              // mutex locked.
+              if (this->registrationCb)
+                this->registrationCb(pub);
+            }
+
+            if (this->verbose)
+            {
+              std::cout << ">> [LivelinessSubscriber] New alive token ('"
+                        << _sample.get_keyexpr().as_string_view() << "')"
+                        << std::endl;
+            }
+          }
+          else if (_sample.get_kind() == Z_SAMPLE_KIND_DELETE)
+          {
+            if (entityType == "MP")
+            {
+              this->info.DelPublisherByNode(
+                pub.Topic(), pub.PUuid(), pub.NUuid());
+            }
+            else if (entityType == "MS" && this->pUuid != pUUID)
+            {
+              this->remoteSubscribers.DelPublisherByNode(
+                pub.Topic(), pub.PUuid(), pub.NUuid());
+              if (this->unregistrationCb)
+                this->unregistrationCb(pub);
+            }
+            if (this->verbose)
+            {
+              std::cout << ">> [LivelinessSubscriber] Dropped token ('"
+                        << _sample.get_keyexpr().as_string_view() << "')"
+                        << std::endl;
+            }
+          }
+        }
+
+        if (cb)
+          cb(pub);
+      }
+
+      //////////////////////////////////////////////////
+      public: void LivelinessSrvDataHandler(const zenoh::Sample &_sample)
+      {
+        DiscoveryCallback<Pub> cb;
+        std::string token{_sample.get_keyexpr().as_string_view()};
+        std::string prefix;
+        std::string partition;
+        std::string service;
+        std::string pUUID;
+        std::string nUUID;
+        std::string entityType;
+        std::string reqType;
+        std::string repType;
+        if (!TopicUtils::DecomposeLivelinessToken(
+          token, prefix, partition, service, pUUID, nUUID, entityType,
+          reqType, repType))
+        {
+          return;
+        };
+
+        ServicePublisher pub(
+          "@" + partition + "@" + service, "", "", pUUID, nUUID, reqType,
+          repType, AdvertiseServiceOptions());
+
+        {
+          std::lock_guard<std::mutex> lock(this->mutex);
+
+          if (_sample.get_kind() == Z_SAMPLE_KIND_PUT)
+          {
+            if (entityType == "SS")
+            {
+              if (!this->info.AddPublisher(pub))
+                return;
+            }
+
+            if (this->verbose)
+            {
+              std::cout << ">> [LivelinessSubscriber] New alive token ('"
+                        << _sample.get_keyexpr().as_string_view() << "')\n";
+            }
+
+            cb = this->connectionCb;
+          }
+          else if (_sample.get_kind() == Z_SAMPLE_KIND_DELETE)
+          {
+            if (entityType == "SS")
+            {
+              this->info.DelPublisherByNode(
+                pub.Topic(), pub.PUuid(), pub.NUuid());
+            }
+            if (this->verbose)
+            {
+              std::cout << ">> [LivelinessSubscriber] Dropped token ('"
+                        << _sample.get_keyexpr().as_string_view() << "')\n";
+            }
+          }
+        }
+
+        if (cb)
+          cb(pub);
+      }
+#endif
+
       /// \brief Start the discovery service. You probably want to register the
       /// callbacks for receiving discovery notifications before starting the
       /// service.
@@ -299,6 +451,24 @@ namespace gz
         // Start the thread that receives discovery information.
         this->threadReception = std::thread(&Discovery::RecvMessages, this);
       }
+
+#ifdef HAVE_ZENOH
+      /// \brief Start the graph cache.
+      public: void Start(std::shared_ptr<zenoh::Session> _session,
+                         LivelinessCallback _cb)
+      {
+        zenoh::Session::LivelinessSubscriberOptions opts;
+        opts.history = true;
+
+        // Notice the Zenoh hermetic namespace starting with @.
+        this->livelinessSubscriber = std::make_unique<zenoh::Subscriber<void>>(
+          _session->liveliness_declare_subscriber(
+            "@gz/**", _cb, zenoh::closures::none, std::move(opts)));
+
+        this->initialized = true;
+        this->useZenoh = true;
+      }
+#endif
 
       /// \brief Advertise a new message.
       /// \param[in] _publisher Publisher's information to advertise.
@@ -459,7 +629,7 @@ namespace gz
         {
           std::lock_guard<std::mutex> lock(this->mutex);
 
-          if (!this->enabled)
+          if (!this->enabled && !useZenoh)
             return false;
 
           // Don't do anything if the topic is not advertised by any of my nodes
@@ -641,6 +811,7 @@ namespace gz
       /// \param[out] _topics List of advertised topics.
       public: void TopicList(std::vector<std::string> &_topics)
       {
+        if (!this->useZenoh)
         {
           std::lock_guard<std::mutex> lock(this->mutex);
           this->remoteSubscribers.Clear();
@@ -1400,15 +1571,7 @@ namespace gz
       /// \return The discovery version.
       private: uint8_t Version() const
       {
-        static std::string gzStats;
-        static int topicStats;
-
-        if (env("GZ_TRANSPORT_TOPIC_STATISTICS", gzStats) && !gzStats.empty())
-        {
-          topicStats = (gzStats == "1");
-        }
-
-        return this->kWireVersion + (topicStats * 100);
+        return this->wireVersion;
       }
 
       /// \brief Register a new network interface in the discovery system.
@@ -1485,7 +1648,7 @@ namespace gz
 
       /// \brief Wire protocol version. Bump up the version number if you modify
       /// the wire protocol (for discovery or message/service exchange).
-      private: static const uint8_t kWireVersion = 10;
+      private: uint8_t wireVersion = 10;
 
       /// \brief Port used to broadcast the discovery messages.
       private: int port;
@@ -1585,6 +1748,14 @@ namespace gz
 
       /// \brief When true, the service is enabled.
       private: bool enabled;
+
+#ifdef HAVE_ZENOH
+      /// \brief The liveliness subscriber.
+      private: std::unique_ptr<zenoh::Subscriber<void>> livelinessSubscriber;
+#endif
+
+      /// \brief ToDo: Find a better way.
+      private: bool useZenoh = false;
     };
 
     /// \def MsgDiscovery

@@ -33,6 +33,7 @@
 #pragma warning(push)
 #pragma warning(disable: 4251)
 #endif
+#include <google/protobuf/text_format.h>
 #include <google/protobuf/util/json_util.h>
 #ifdef _MSC_VER
 #pragma warning(pop)
@@ -45,9 +46,8 @@
 #include "gz/transport/Helpers.hh"
 #include "gz/transport/Node.hh"
 
-using namespace gz;
-using namespace transport;
-
+namespace gz::transport
+{
 //////////////////////////////////////////////////
 extern "C" void cmdTopicList()
 {
@@ -271,7 +271,15 @@ extern "C" void cmdServiceReq(const char *_service,
     if (executed)
     {
       if (result)
-        std::cout << rep->DebugString() << std::endl;
+      {
+        if (std::string str;
+            google::protobuf::TextFormat::PrintToString(*rep, &str))
+        {
+          std::cout << str << std::endl;
+        }
+        else
+          std::cerr << "Error printing message" << std::endl;
+      }
       else
         std::cout << "Service call failed" << std::endl;
     }
@@ -301,7 +309,13 @@ extern "C" void cmdTopicEcho(const char *_topic,
     {
       case MsgOutputFormat::kDefault:
       case MsgOutputFormat::kDebugString:
-        std::cout << _msg.DebugString() << std::endl;
+        if (std::string str;
+            google::protobuf::TextFormat::PrintToString(_msg, &str))
+        {
+          std::cout << str << std::endl;
+        }
+        else
+          std::cerr << "Error printing message" << std::endl;
         break;
       case MsgOutputFormat::kJSON:
         {
@@ -430,3 +444,4 @@ extern "C" const char *gzVersion()
 {
   return GZ_TRANSPORT_VERSION_FULL;
 }
+}  // namespace gz::transport

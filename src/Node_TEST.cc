@@ -14,6 +14,7 @@
  * limitations under the License.
  *
 */
+#include <google/protobuf/text_format.h>
 #include "gtest/gtest.h"
 
 #include <gz/msgs/int32.pb.h>
@@ -125,11 +126,15 @@ void rawCbInfo(const char *_msgData, const size_t _size,
 
 //////////////////////////////////////////////////
 /// \brief A generic callback.
-void genericCb(const transport::ProtoMsg &_msg)
+void genericCb(const transport::ProtoMsg &_msg,
+               const transport::MessageInfo &_info)
 {
-  std::string content = _msg.DebugString();
+  std::string content;
+  ASSERT_TRUE(google::protobuf::TextFormat::PrintToString(_msg, &content));
   EXPECT_TRUE(content.find(std::to_string(data)) != std::string::npos);
   genericCbExecuted = true;
+
+  EXPECT_EQ(_info.Topic().find("@"), std::string::npos);
 }
 
 //////////////////////////////////////////////////
@@ -968,6 +973,15 @@ TEST(NodeSubTest, BoolOperatorTest)
   const transport::Node::Subscriber sub2_const =
       node.CreateSubscriber(g_topic, cb);
   EXPECT_TRUE(sub2_const);
+}
+
+//////////////////////////////////////////////////
+/// \brief Exercise the Subscriber move constructor.
+TEST(NodeTest, MoveSubscriber)
+{
+  transport::Node node;
+  std::vector<transport::Node::Subscriber> subscribers;
+  subscribers.emplace_back(node.CreateSubscriber(g_topic, cb));
 }
 
 //////////////////////////////////////////////////

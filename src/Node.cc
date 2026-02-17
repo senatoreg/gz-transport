@@ -44,205 +44,224 @@
 using namespace gz;
 using namespace transport;
 
-namespace gz
+namespace gz::transport
 {
-  namespace transport
+inline namespace GZ_TRANSPORT_VERSION_NAMESPACE
+{
+/// \brief Flag to detect SIGINT or SIGTERM while the code is executing
+/// waitForShutdown().
+static bool g_shutdown = false;
+
+/// \brief Mutex to protect the boolean shutdown variable.
+static std::mutex g_shutdown_mutex;
+
+/// \brief Condition variable to wakeup waitForShutdown() and exit.
+static std::condition_variable g_shutdown_cv;
+
+//////////////////////////////////////////////////
+/// \brief Function executed when a SIGINT or SIGTERM signals are captured.
+/// \param[in] _signal Signal received.
+static void signal_handler(const int _signal)
+{
+  if (_signal == SIGINT || _signal == SIGTERM)
   {
-    inline namespace GZ_TRANSPORT_VERSION_NAMESPACE
-    {
-    /// \brief Flag to detect SIGINT or SIGTERM while the code is executing
-    /// waitForShutdown().
-    static bool g_shutdown = false;
-
-    /// \brief Mutex to protect the boolean shutdown variable.
-    static std::mutex g_shutdown_mutex;
-
-    /// \brief Condition variable to wakeup waitForShutdown() and exit.
-    static std::condition_variable g_shutdown_cv;
-
-    //////////////////////////////////////////////////
-    /// \brief Function executed when a SIGINT or SIGTERM signals are captured.
-    /// \param[in] _signal Signal received.
-    static void signal_handler(const int _signal)
-    {
-      if (_signal == SIGINT || _signal == SIGTERM)
-      {
-        g_shutdown_mutex.lock();
-        g_shutdown = true;
-        g_shutdown_mutex.unlock();
-        g_shutdown_cv.notify_all();
-      }
-    }
-
-    //////////////////////////////////////////////////
-    int rcvHwm()
-    {
-      return NodeShared::Instance()->RcvHwm();
-    }
-
-    //////////////////////////////////////////////////
-    int sndHwm()
-    {
-      return NodeShared::Instance()->SndHwm();
-    }
-
-    //////////////////////////////////////////////////
-    void waitForShutdown()
-    {
-      // Install a signal handler for SIGINT and SIGTERM.
-      std::signal(SIGINT,  signal_handler);
-      std::signal(SIGTERM, signal_handler);
-
-      std::unique_lock<std::mutex> lk(g_shutdown_mutex);
-      g_shutdown_cv.wait(lk, []{return g_shutdown;});
-    }
-
-    //////////////////////////////////////////////////
-    /// \internal
-    /// \brief Private data for Node::Publisher class.
-    class Node::PublisherPrivate
-    {
-      /// \brief Default constructor.
-      public: PublisherPrivate()
-        : shared(NodeShared::Instance())
-      {
-      }
-
-      /// \brief Constructor
-      /// \param[in] _publisher The message publisher.
-      public: explicit PublisherPrivate(const MessagePublisher &_publisher)
-        : shared(NodeShared::Instance()),
-          publisher(_publisher)
-      {
-      }
-
-      /// \brief Check if this Publisher is ready to send an update based on
-      /// publication settings and the clock.
-      ///
-      /// \return True if it is okay to publish, false otherwise.
-      public: bool ThrottledUpdateReady() const
-      {
-        if (!this->publisher.Options().Throttled())
-          return true;
-
-        Timestamp now = std::chrono::steady_clock::now();
-
-        std::lock_guard<std::mutex> lk(this->mutex);
-        auto elapsed = now - this->lastCbTimestamp;
-        return std::chrono::duration_cast<std::chrono::nanoseconds>(
-              elapsed).count() >= this->periodNs;
-      }
-
-      /// \brief Check if this Publisher is ready to send an update based on
-      /// publication settings and the clock.
-      ///
-      /// This additionally advances the internal timestamp by one period.
-      ///
-      /// \return True if it is okay to publish, false otherwise.
-      public: bool UpdateThrottling()
-      {
-        if (!this->publisher.Options().Throttled())
-          return true;
-
-        if (!this->ThrottledUpdateReady())
-          return false;
-
-        // Update the last callback execution.
-        std::lock_guard<std::mutex> lk(this->mutex);
-        this->lastCbTimestamp = std::chrono::steady_clock::now();
-        return true;
-      }
-
-      /// \brief Check if this Publisher is valid
-      /// \return True if we have a topic to publish to, otherwise false.
-      public: bool Valid()
-      {
-        return !this->publisher.Topic().empty();
-      }
-
-      /// \brief Destructor.
-      public: virtual ~PublisherPrivate()
-      {
-        std::lock_guard<std::recursive_mutex> lk(this->shared->mutex);
-        // Notify the discovery service to unregister and unadvertise my topic.
-        if (!this->shared->dataPtr->msgDiscovery->Unadvertise(
-               this->publisher.Topic(), this->publisher.NUuid()))
-        {
-          std::cerr << "~PublisherPrivate() Error unadvertising topic ["
-                    << this->publisher.Topic() << "]" << std::endl;
-        }
-      }
-
-      /// \brief Create a MessageInfo object for this Publisher
-      MessageInfo CreateMessageInfo()
-      {
-        MessageInfo info;
-
-        // Set the topic and the partition at the same time
-        info.SetTopicAndPartition(this->publisher.Topic());
-
-        // Set the message type name
-        info.SetType(this->publisher.MsgTypeName());
-
-        return info;
-      }
-
-      /// \brief Pointer to the object shared between all the nodes within the
-      /// same process.
-      public: NodeShared *shared = nullptr;
-
-      /// \brief The message publisher.
-      public: MessagePublisher publisher;
-
-      /// \brief Timestamp of the last callback executed.
-      public: Timestamp lastCbTimestamp;
-
-      /// \brief If throttling is enabled, the minimum period for receiving a
-      /// message in nanoseconds.
-      public: double periodNs = 0.0;
-
-      /// \brief Mutex to protect the node::publisher from race conditions.
-      public: mutable std::mutex mutex;
-    };
-
-    //////////////////////////////////////////////////
-    /// \internal
-    /// \brief Private data for Node::Subscriber class.
-    class Node::SubscriberPrivate
-    {
-      /// \brief Constructor
-      public: SubscriberPrivate()
-        : shared(NodeShared::Instance())
-      {
-      }
-
-      /// \brief Check if this subscriber is valid
-      /// \return True if topic, node and handler ids are not empty.
-      public: bool Valid()
-      {
-        return !this->topic.empty() && !this->hUuid.empty() &&
-               !this->nUuid.empty();
-      }
-
-      /// \brief Pointer to the object shared between all the nodes within the
-      /// same process.
-      public: NodeShared *shared = nullptr;
-
-      /// \brief Topic name
-      public: std::string topic;
-
-      /// \brief Node UUID
-      public: std::string nUuid;
-
-      /// \brief Node options
-      public: NodeOptions nOpts;
-
-      /// \brief Handler UUID
-      public: std::string hUuid;
-    };
-    }
+    g_shutdown_mutex.lock();
+    g_shutdown = true;
+    g_shutdown_mutex.unlock();
+    g_shutdown_cv.notify_all();
   }
 }
+
+//////////////////////////////////////////////////
+int rcvHwm()
+{
+  return NodeShared::Instance()->RcvHwm();
+}
+
+//////////////////////////////////////////////////
+int sndHwm()
+{
+  return NodeShared::Instance()->SndHwm();
+}
+
+//////////////////////////////////////////////////
+void waitForShutdown()
+{
+  // Install a signal handler for SIGINT and SIGTERM.
+  std::signal(SIGINT,  signal_handler);
+  std::signal(SIGTERM, signal_handler);
+
+  std::unique_lock<std::mutex> lk(g_shutdown_mutex);
+  g_shutdown_cv.wait(lk, []{return g_shutdown;});
+}
+
+//////////////////////////////////////////////////
+/// \internal
+/// \brief Private data for Node::Publisher class.
+class Node::PublisherPrivate
+{
+  /// \brief Default constructor.
+  public: PublisherPrivate()
+    : shared(NodeShared::Instance())
+  {
+  }
+
+  /// \brief Constructor
+  /// \param[in] _publisher The message publisher.
+  public: explicit PublisherPrivate(const MessagePublisher &_publisher)
+    : shared(NodeShared::Instance()),
+      publisher(_publisher)
+  {
+  }
+
+#ifdef HAVE_ZENOH
+  /// \brief Constructor
+  /// \param[in] _publisher The message publisher.
+  /// \param[in] _zPub The zenoh publisher.
+  /// \param[in] _zToken The zenoh liveliness token.
+  public: explicit PublisherPrivate(const MessagePublisher &_publisher,
+                                    zenoh::Publisher _zPub,
+                                    zenoh::LivelinessToken _zToken)
+    : shared(NodeShared::Instance()),
+      publisher(_publisher),
+      zPub(std::make_unique<zenoh::Publisher>(std::move(_zPub))),
+      zToken(std::make_unique<zenoh::LivelinessToken>(std::move(_zToken)))
+  {
+  }
+#endif
+
+  /// \brief Check if this Publisher is ready to send an update based on
+  /// publication settings and the clock.
+  ///
+  /// \return True if it is okay to publish, false otherwise.
+  public: bool ThrottledUpdateReady() const
+  {
+    if (!this->publisher.Options().Throttled())
+      return true;
+
+    Timestamp now = std::chrono::steady_clock::now();
+
+    std::lock_guard<std::mutex> lk(this->mutex);
+    auto elapsed = now - this->lastCbTimestamp;
+    return std::chrono::duration_cast<std::chrono::nanoseconds>(
+          elapsed).count() >= this->periodNs;
+  }
+
+  /// \brief Check if this Publisher is ready to send an update based on
+  /// publication settings and the clock.
+  ///
+  /// This additionally advances the internal timestamp by one period.
+  ///
+  /// \return True if it is okay to publish, false otherwise.
+  public: bool UpdateThrottling()
+  {
+    if (!this->publisher.Options().Throttled())
+      return true;
+
+    if (!this->ThrottledUpdateReady())
+      return false;
+
+    // Update the last callback execution.
+    std::lock_guard<std::mutex> lk(this->mutex);
+    this->lastCbTimestamp = std::chrono::steady_clock::now();
+    return true;
+  }
+
+  /// \brief Check if this Publisher is valid
+  /// \return True if we have a topic to publish to, otherwise false.
+  public: bool Valid()
+  {
+    return !this->publisher.Topic().empty();
+  }
+
+  /// \brief Destructor.
+  public: virtual ~PublisherPrivate()
+  {
+    std::lock_guard<std::recursive_mutex> lk(this->shared->mutex);
+    // Notify the discovery service to unregister and unadvertise my topic.
+    if (!this->shared->dataPtr->msgDiscovery->Unadvertise(
+           this->publisher.Topic(), this->publisher.NUuid()))
+    {
+      std::cerr << "~PublisherPrivate() Error unadvertising topic ["
+                << this->publisher.Topic() << "]" << std::endl;
+    }
+  }
+
+  /// \brief Create a MessageInfo object for this Publisher
+  MessageInfo CreateMessageInfo()
+  {
+    MessageInfo info;
+
+    // Set the topic and the partition at the same time
+    info.SetTopicAndPartition(this->publisher.Topic());
+
+    // Set the message type name
+    info.SetType(this->publisher.MsgTypeName());
+
+    return info;
+  }
+
+  /// \brief Pointer to the object shared between all the nodes within the
+  /// same process.
+  public: NodeShared *shared = nullptr;
+
+  /// \brief The message publisher.
+  public: MessagePublisher publisher;
+
+#ifdef HAVE_ZENOH
+  /// \brief The zenoh publisher.
+  public: std::unique_ptr<zenoh::Publisher> zPub;
+
+  /// \brief The liveliness token.
+  public: std::unique_ptr<zenoh::LivelinessToken> zToken;
+#endif
+
+  /// \brief Timestamp of the last callback executed.
+  public: Timestamp lastCbTimestamp;
+
+  /// \brief If throttling is enabled, the minimum period for receiving a
+  /// message in nanoseconds.
+  public: double periodNs = 0.0;
+
+  /// \brief Mutex to protect the node::publisher from race conditions.
+  public: mutable std::mutex mutex;
+};
+
+//////////////////////////////////////////////////
+/// \internal
+/// \brief Private data for Node::Subscriber class.
+class Node::SubscriberPrivate
+{
+  /// \brief Constructor
+  public: SubscriberPrivate()
+    : shared(NodeShared::Instance())
+  {
+  }
+
+  /// \brief Check if this subscriber is valid
+  /// \return True if topic, node and handler ids are not empty.
+  public: bool Valid()
+  {
+    return !this->topic.empty() && !this->hUuid.empty() &&
+           !this->nUuid.empty();
+  }
+
+  /// \brief Pointer to the object shared between all the nodes within the
+  /// same process.
+  public: NodeShared *shared = nullptr;
+
+  /// \brief Topic name
+  public: std::string topic;
+
+  /// \brief Node UUID
+  public: std::string nUuid;
+
+  /// \brief Node options
+  public: NodeOptions nOpts;
+
+  /// \brief Handler UUID
+  public: std::string hUuid;
+};
 
 //////////////////////////////////////////////////
 Node::Subscriber::Subscriber()
@@ -307,6 +326,7 @@ bool Node::Subscriber::Valid() const
 
 //////////////////////////////////////////////////
 Node::Subscriber::Subscriber(Node::Subscriber &&_other)
+  : dataPtr(std::make_shared<SubscriberPrivate>())
 {
   *this = std::move(_other);
 }
@@ -345,6 +365,22 @@ Node::Publisher::Publisher(const MessagePublisher &_publisher)
       1e9 / this->dataPtr->publisher.Options().MsgsPerSec();
   }
 }
+
+#ifdef HAVE_ZENOH
+//////////////////////////////////////////////////
+Node::Publisher::Publisher(const MessagePublisher &_publisher,
+                           zenoh::Publisher &&_zPub,
+                           zenoh::LivelinessToken &&_zToken)
+  : dataPtr(std::make_shared<PublisherPrivate>(
+    _publisher, std::move(_zPub), std::move(_zToken)))
+{
+  if (this->dataPtr->publisher.Options().Throttled())
+  {
+    this->dataPtr->periodNs =
+      1e9 / this->dataPtr->publisher.Options().MsgsPerSec();
+  }
+}
+#endif
 
 //////////////////////////////////////////////////
 Node::Publisher::~Publisher()
@@ -531,25 +567,48 @@ bool Node::Publisher::Publish(const ProtoMsg &_msg)
   }
 
   // Handle remote subscribers.
-  if (subscribers.haveRemote)
+  std::string impl = this->dataPtr->shared->GzImplementation();
+  if (impl == "zeromq")
   {
-    // Zmq will call this lambda when the message is published.
-    // We use it to deallocate the buffer.
-    auto myDeallocator = [](void *_buffer, void *)
+    if (subscribers.haveRemote)
     {
-      delete[] reinterpret_cast<char*>(_buffer);
-    };
+      // Zmq will call this lambda when the message is published.
+      // We use it to deallocate the buffer.
+      auto myDeallocator = [](void *_buffer, void *)
+      {
+        delete[] reinterpret_cast<char*>(_buffer);
+      };
 
-    if (!this->dataPtr->shared->Publish(this->dataPtr->publisher.Topic(),
-          msgBuffer, msgSize, myDeallocator, std::string(_msg.GetTypeName())))
+      if (!this->dataPtr->shared->Publish(this->dataPtr->publisher.Topic(),
+            msgBuffer, msgSize, myDeallocator, std::string(_msg.GetTypeName())))
+      {
+        return false;
+      }
+    }
+    else
     {
-      return false;
+      delete[] msgBuffer;
     }
   }
-  else
+#ifdef HAVE_ZENOH
+  else if (impl == "zenoh")
   {
-    delete[] msgBuffer;
+    if (subscribers.haveRemote)
+    {
+      zenoh::Publisher::PutOptions options;
+      // Add message type as an attachment.
+      options.attachment = this->dataPtr->publisher.MsgTypeName();
+
+      // Zenoh will call this lambda once Bytes objects are destroyed
+      auto deleter = [](uint8_t *_buffer) { delete[] _buffer; };
+      auto zMsgBuffer = reinterpret_cast<uint8_t *>(msgBuffer);
+      this->dataPtr->zPub->put(zenoh::Bytes(zMsgBuffer, msgSize, deleter),
+                               std::move(options));
+    }
   }
+#endif
+  else
+    return false;
 
   return true;
 }
@@ -559,12 +618,12 @@ bool Node::Publisher::PublishRaw(
     const std::string &_msgData,
     const std::string &_msgType)
 {
-  if (!this->dataPtr->Valid())
+  if (!this->Valid())
     return false;
 
   const std::string &publisherMsgType = this->dataPtr->publisher.MsgTypeName();
 
-  if (publisherMsgType  != _msgType && publisherMsgType != kGenericMessageType)
+  if (publisherMsgType != _msgType && publisherMsgType != kGenericMessageType)
   {
     std::cerr << "Node::Publisher::PublishRaw() type mismatch.\n"
               << "\t* Type advertised: "
@@ -573,7 +632,7 @@ bool Node::Publisher::PublishRaw(
     return false;
   }
 
-  if (!this->dataPtr->UpdateThrottling())
+  if (!this->UpdateThrottling())
     return true;
 
   const std::string &topic = this->dataPtr->publisher.Topic();
@@ -596,18 +655,39 @@ bool Node::Publisher::PublishRaw(
     const std::size_t msgSize = _msgData.size();
     char *msgBuffer = static_cast<char *>(new char[msgSize]);
     memcpy(msgBuffer, _msgData.c_str(), msgSize);
-    auto myDeallocator = [](void *_buffer, void * /*_hint*/)
-    {
-      delete[] reinterpret_cast<char*>(_buffer);
-    };
 
-    // Note: This will copy _msgData (i.e. not zero copy)
-    if (!this->dataPtr->shared->Publish(
-          this->dataPtr->publisher.Topic(),
-          msgBuffer, msgSize, myDeallocator, _msgType))
+    std::string impl = this->dataPtr->shared->GzImplementation();
+    if (impl == "zeromq")
     {
-      return false;
+      auto myDeallocator = [](void *_buffer, void * /*_hint*/)
+      {
+        delete[] reinterpret_cast<char*>(_buffer);
+      };
+
+      // Note: This will copy _msgData (i.e. not zero copy)
+      if (!this->dataPtr->shared->Publish(
+            this->dataPtr->publisher.Topic(),
+            msgBuffer, msgSize, myDeallocator, _msgType))
+      {
+        return false;
+      }
     }
+#ifdef HAVE_ZENOH
+    else if (impl == "zenoh")
+    {
+      zenoh::Publisher::PutOptions options;
+      // Add message type as an attachment.
+      options.attachment = this->dataPtr->publisher.MsgTypeName();
+
+      // Zenoh will call this lambda once Bytes objects are destroyed
+      auto deleter = [](uint8_t *_buffer) { delete[] _buffer; };
+      auto zMsgBuffer = reinterpret_cast<uint8_t *>(msgBuffer);
+      this->dataPtr->zPub->put(zenoh::Bytes(zMsgBuffer, msgSize, deleter),
+                               std::move(options));
+    }
+#endif
+    else
+      return false;
   }
 
   return true;
@@ -761,7 +841,7 @@ bool Node::UnadvertiseSrv(const std::string &_topic)
   this->dataPtr->srvsAdvertised.erase(fullyQualifiedTopic);
 
   // Remove all the REP handlers for this node.
-  this->dataPtr->shared->repliers.RemoveHandlersForNode(
+  this->dataPtr->shared->Repliers().RemoveHandlersForNode(
     fullyQualifiedTopic, this->dataPtr->nUuid);
 
   // Notify the discovery service to unregister and unadvertise my services.
@@ -839,10 +919,10 @@ bool Node::SubscribeRaw(
   std::string topic = _topic;
   this->Options().TopicRemap(_topic, topic);
 
-  std::string fullyQualifiedTopic;
-  if (!TopicUtils::FullyQualifiedName(this->dataPtr->options.Partition(),
-                                      this->dataPtr->options.NameSpace(),
-                                      _topic, fullyQualifiedTopic))
+  FullyQualifiedTopic fullyQualifiedTopic(this->dataPtr->options.Partition(),
+                                          this->dataPtr->options.NameSpace(),
+                                          topic);
+  if (!fullyQualifiedTopic.FullTopic())
   {
     std::cerr << "Topic [" << _topic << "] is not valid." << std::endl;
     return false;
@@ -850,16 +930,30 @@ bool Node::SubscribeRaw(
 
   const std::shared_ptr<RawSubscriptionHandler> handlerPtr =
       std::make_shared<RawSubscriptionHandler>(
-        this->dataPtr->nUuid, _msgType, _opts);
+        this->Shared()->pUuid, this->dataPtr->nUuid, _msgType, _opts);
 
-  handlerPtr->SetCallback(_callback);
+  // Insert the callback into the handler.
+  std::string impl = this->Shared()->GzImplementation();
+  if (impl == "zeromq")
+  {
+    handlerPtr->SetCallback(_callback);
+  }
+#ifdef HAVE_ZENOH
+  else if (impl == "zenoh")
+  {
+    handlerPtr->SetCallback(std::move(_callback),
+      this->Shared()->Session(), fullyQualifiedTopic);
+  }
+#endif
+  else
+    return false;
 
   std::lock_guard<std::recursive_mutex> lk(this->dataPtr->shared->mutex);
 
   this->dataPtr->shared->localSubscribers.raw.AddHandler(
-        fullyQualifiedTopic, this->dataPtr->nUuid, handlerPtr);
+        *fullyQualifiedTopic.FullTopic(), this->dataPtr->nUuid, handlerPtr);
 
-  return this->SubscribeHelper(fullyQualifiedTopic);
+  return this->SubscribeHelper(*fullyQualifiedTopic.FullTopic());
 }
 
 //////////////////////////////////////////////////
@@ -946,14 +1040,6 @@ std::unordered_set<std::string> &Node::TopicsSubscribed() const
 std::unordered_set<std::string> &Node::SrvsAdvertised() const
 {
   return this->dataPtr->srvsAdvertised;
-}
-
-//////////////////////////////////////////////////
-bool Node::TopicInfo(const std::string &_topic,
-                     std::vector<MessagePublisher> &_publishers) const
-{
-  std::vector<MessagePublisher> unused;
-  return this->TopicInfo(_topic, _publishers, unused);
 }
 
 //////////////////////////////////////////////////
@@ -1080,7 +1166,7 @@ Node::Publisher Node::Advertise(const std::string &_topic,
   auto currentTopics = this->AdvertisedTopics();
 
   if (std::find(currentTopics.begin(), currentTopics.end(),
-        fullyQualifiedTopic) != currentTopics.end())
+        _topic) != currentTopics.end())
   {
     std::cerr << "Topic [" << topic << "] already advertised. You cannot"
       << " advertise the same topic twice on the same node."
@@ -1093,21 +1179,46 @@ Node::Publisher Node::Advertise(const std::string &_topic,
 
   // Notify the discovery service to register and advertise my topic.
   MessagePublisher publisher(fullyQualifiedTopic,
-      this->Shared()->myAddress,
+      this->Shared()->MyAddress(),
       // this->Shared()->myControlAddress,
       "unused",
       this->Shared()->pUuid, this->NodeUuid(), _msgTypeName, _options);
 
-  if (!this->Shared()->dataPtr->msgDiscovery->Advertise(publisher))
+  std::string impl = this->dataPtr->shared->GzImplementation();
+  if (impl == "zeromq")
   {
-    std::cerr << "Node::Advertise(): Error advertising topic ["
-      << topic
-      << "]. Did you forget to start the discovery service?"
-      << std::endl;
-    return Publisher();
-  }
+    if (!this->Shared()->dataPtr->msgDiscovery->Advertise(publisher))
+    {
+      std::cerr << "Node::Advertise(): Error advertising topic ["
+        << topic
+        << "]. Did you forget to start the discovery service?"
+        << std::endl;
+      return Publisher();
+    }
 
-  return Publisher(publisher);
+    return Publisher(publisher);
+  }
+#ifdef HAVE_ZENOH
+  else if (impl == "zenoh")
+  {
+    auto zPub = this->Shared()->dataPtr->session->declare_publisher(
+     zenoh::KeyExpr(fullyQualifiedTopic));
+
+    std::string token = TopicUtils::CreateLivelinessToken(
+      fullyQualifiedTopic, this->Shared()->pUuid, this->NodeUuid(), "MP",
+      _msgTypeName);
+
+    if (token.empty())
+      return Publisher();
+
+    auto zToken =
+      this->Shared()->dataPtr->session->liveliness_declare_token(token);
+
+    return Publisher(publisher, std::move(zPub), std::move(zToken));
+  }
+#endif
+  else
+    return Publisher();
 }
 
 /////////////////////////////////////////////////
@@ -1161,3 +1272,5 @@ void Node::AddGlobalRelay(const std::string& _relayAddress) {
 std::vector<std::string> Node::GlobalRelays() const {
   return Shared()->GlobalRelays();
 }
+}  // namespace GZ_TRANSPORT_VERSION_NAMESPACE
+}  // namespace gz::transport

@@ -1,3 +1,134 @@
+## Gazebo Transport 15.X
+
+### Gazebo Transport 15.0.2 (2026-01-20)
+
+1. Refactor TopicUtils::AsValidTopic() removing regex (#777)
+    * [Pull request #778](https://github.com/gazebosim/gz-transport/pull/778)
+
+1. Find jetty packages with explicit version
+    * [Pull request #774](https://github.com/gazebosim/gz-transport/pull/774)
+
+1. Bazel updates
+    * [Pull request #757](https://github.com/gazebosim/gz-transport/pull/757)
+    * [Pull request #756](https://github.com/gazebosim/gz-transport/pull/756)
+
+1. Fix unused-result complaint
+    * [Pull request #763](https://github.com/gazebosim/gz-transport/pull/763)
+
+1. Enable remaining Zenoh tests (#761)
+    * [Pull request #762](https://github.com/gazebosim/gz-transport/pull/762)
+
+### Gazebo Transport 15.0.1 (2025-12-17)
+
+1. Only check GZ_TRANSPORT_TOPIC_STATISTICS once
+    * [Pull request #731](https://github.com/gazebosim/gz-transport/pull/731)
+
+1. Parse the version correctly when using gz log subcommands
+    * [Pull request #750](https://github.com/gazebosim/gz-transport/pull/750)
+
+1. Bazel updates
+    * [Pull request #744](https://github.com/gazebosim/gz-transport/pull/744)
+    * [Pull request #749](https://github.com/gazebosim/gz-transport/pull/749)
+
+1. Adding zenoh_echo example (#732)
+    * [Pull request #740](https://github.com/gazebosim/gz-transport/pull/740)
+
+1. Initialize move constructor (#718)
+    * [Pull request #719](https://github.com/gazebosim/gz-transport/pull/719)
+
+1. Set GZ_IP for gz_src_TEST
+    * [Pull request #723](https://github.com/gazebosim/gz-transport/pull/723)
+
+### Gazebo Transport 15.0.0 (2025-09-30)
+
+1. **Baseline:** this includes all changes from 14.1.0 and earlier.
+
+1. [bazel] Enable unit tests
+    * [Pull request #715](https://github.com/gazebosim/gz-transport/pull/715)
+
+1. Add null-check for gz param parameters in three functions to prevent crashes
+    * [Pull request #710](https://github.com/gazebosim/gz-transport/pull/710)
+
+1. Fix small typo in services tutorial
+    * [Pull request #703](https://github.com/gazebosim/gz-transport/pull/703)
+
+1. Fix Dockerfile and update relay tutorial
+    * [Pull request #702](https://github.com/gazebosim/gz-transport/pull/702)
+
+1. Update installation instructions for Ubuntu source
+    * [Pull request #700](https://github.com/gazebosim/gz-transport/pull/700)
+
+1. Update bazel module to use jetty release branches
+    * [Pull request #699](https://github.com/gazebosim/gz-transport/pull/699)
+
+1. Zenoh integration
+    * [Pull request #708](https://github.com/gazebosim/gz-transport/pull/708)
+    * [Pull request #707](https://github.com/gazebosim/gz-transport/pull/707)
+    * [Pull request #697](https://github.com/gazebosim/gz-transport/pull/697)
+    * [Pull request #696](https://github.com/gazebosim/gz-transport/pull/696)
+    * [Pull request #691](https://github.com/gazebosim/gz-transport/pull/691)
+    * [Pull request #686](https://github.com/gazebosim/gz-transport/pull/686)
+    * [Pull request #684](https://github.com/gazebosim/gz-transport/pull/684)
+    * [Pull request #681](https://github.com/gazebosim/gz-transport/pull/681)
+    * [Pull request #665](https://github.com/gazebosim/gz-transport/pull/665)
+
+1. Properly terminate auxiliary processes when test exits
+    * [Pull request #680](https://github.com/gazebosim/gz-transport/pull/680)
+
+1. Replace DebugString() with PrintToString()
+    * [Pull request #685](https://github.com/gazebosim/gz-transport/pull/685)
+
+1. [Bazel] Update gz-discovery-header deps
+    * [Pull request #683](https://github.com/gazebosim/gz-transport/pull/683)
+
+1. Fix Helpers_TEST on windows
+    * [Pull request #682](https://github.com/gazebosim/gz-transport/pull/682)
+
+1. Fix compatibility with protobuf v30 (cpp 6.30.0) regression
+    * [Pull request #672](https://github.com/gazebosim/gz-transport/pull/672)
+
+1. Fix deadlock in service requests when running local callbacks
+    * [Pull request #671](https://github.com/gazebosim/gz-transport/pull/671)
+
+1. BugFix :  Failure to catch after throwing an error causes a crash
+    * [Pull request #662](https://github.com/gazebosim/gz-transport/pull/662)
+
+1. Standalone gz log executable
+    * [Pull request #658](https://github.com/gazebosim/gz-transport/pull/658)
+
+1. Clean up namespaces
+    * [Pull request #653](https://github.com/gazebosim/gz-transport/pull/653)
+    * [Pull request #649](https://github.com/gazebosim/gz-transport/pull/649)
+    * [Pull request #642](https://github.com/gazebosim/gz-transport/pull/642)
+    * [Pull request #637](https://github.com/gazebosim/gz-transport/pull/637)
+
+1. parameters: use gz.msgs instead of gz_msgs
+    * [Pull request #648](https://github.com/gazebosim/gz-transport/pull/648)
+
+1. parameters: support non-qualified message names
+    * [Pull request #647](https://github.com/gazebosim/gz-transport/pull/647)
+
+1. Client_TEST: check more APIs, more error output
+    * [Pull request #646](https://github.com/gazebosim/gz-transport/pull/646)
+
+1. Remove deprecated functions.
+    * [Pull request #641](https://github.com/gazebosim/gz-transport/pull/641)
+
+1. [Bazel] Bump libzmq dep to 4.3.5.bcr.3
+    * [Pull request #636](https://github.com/gazebosim/gz-transport/pull/636)
+
+1. Bump gz-cmake and others in jetty
+    * [Pull request #634](https://github.com/gazebosim/gz-transport/pull/634)
+
+1. Disable Jammy CI
+    * [Pull request #616](https://github.com/gazebosim/gz-transport/pull/616)
+
+1. Build python bindings without version number
+    * [Pull request #604](https://github.com/gazebosim/gz-transport/pull/604)
+
+1. Remove major version from package name
+    * [Pull request #594](https://github.com/gazebosim/gz-transport/pull/594)
+
 ## Gazebo Transport 14.X
 
 ### Gazebo Transport 14.1.0 (2025-05-13)
@@ -133,6 +264,23 @@
 
 
 ## Gazebo Transport 13.X
+
+### Gazebo Transport 13.4.1 (2025-01-30)
+
+1. Add compatibility with protobuf 28
+    * [Pull request #541](https://github.com/gazebosim/gz-transport/pull/541)
+
+1. Permit building python bindings separately from main library
+    * [Pull request #554](https://github.com/gazebosim/gz-transport/pull/554)
+
+1. Disable `playback.ReplayStep` for windows
+    * [Pull request #517](https://github.com/gazebosim/gz-transport/pull/517)
+
+1. Added Prerequisites section in python tutorial
+    * [Pull request #516](https://github.com/gazebosim/gz-transport/pull/516)
+
+1. `IGN_IP` -> `GZ_IP` in comments and error messages
+    * [Pull request #515](https://github.com/gazebosim/gz-transport/pull/515)
 
 ### Gazebo Transport 13.4.0 (2024-06-18)
 

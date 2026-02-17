@@ -2,11 +2,11 @@ cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 
 # Detect if we are doing a standalone build of the bindings, using an external gz-transport
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
-  find_package(gz-cmake4 4.1.0 REQUIRED)
+  find_package(gz-cmake 5 REQUIRED)
   gz_get_package_xml_version(${CMAKE_SOURCE_DIR}/../package.xml PACKAGE_XML)
-  project(gz-transport${PACKAGE_XML_VERSION_MAJOR}-python VERSION ${PACKAGE_XML_VERSION})
-  find_package(gz-transport${PROJECT_VERSION_MAJOR} REQUIRED)
-  set(PROJECT_LIBRARY_TARGET_NAME "gz-transport${PROJECT_VERSION_MAJOR}::gz-transport${PROJECT_VERSION_MAJOR}")
+  project(gz-transport-python VERSION ${PACKAGE_XML_VERSION})
+  find_package(gz-transport 15 REQUIRED)
+  set(PROJECT_LIBRARY_TARGET_NAME "gz-transport::gz-transport")
   # require python dependencies to be found
   find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
   set(CMAKE_REQUIRE_FIND_PACKAGE_pybind11 TRUE)
@@ -47,7 +47,7 @@ set(GZ_PYTHON_INSTALL_PATH "${GZ_PYTHON_INSTALL_PATH}/gz")
 function(configure_build_install_location _library_name)
   # Install library for actual use
   install(TARGETS ${_library_name}
-    DESTINATION "${GZ_PYTHON_INSTALL_PATH}/transport${PROJECT_VERSION_MAJOR}"
+    DESTINATION "${GZ_PYTHON_INSTALL_PATH}/transport"
   )
 endfunction()
 
@@ -65,6 +65,12 @@ target_link_libraries(${BINDINGS_MODULE_NAME} PRIVATE
   ${PROJECT_LIBRARY_TARGET_NAME}
 )
 
+if (HAVE_ZENOH)
+  target_link_libraries(${BINDINGS_MODULE_NAME} PRIVATE
+    zenohcxx::zenohc
+  )
+endif()
+
 target_compile_definitions(${BINDINGS_MODULE_NAME} PRIVATE
   BINDINGS_MODULE_NAME=${BINDINGS_MODULE_NAME})
 
@@ -72,7 +78,7 @@ configure_build_install_location(${BINDINGS_MODULE_NAME})
 
 install(FILES
   src/__init__.py  
-  DESTINATION "${GZ_PYTHON_INSTALL_PATH}/transport${PROJECT_VERSION_MAJOR}"
+  DESTINATION "${GZ_PYTHON_INSTALL_PATH}/transport"
 )
 
 if (BUILD_TESTING AND NOT WIN32)
